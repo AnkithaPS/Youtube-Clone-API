@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const mongooseAggregatePaginate = require("mongoose-aggregate-paginate-v2");
-const { describe } = require("node:test");
 
 const videoSchema = new mongoose.Schema(
   {
@@ -72,6 +71,7 @@ const videoSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+//
 videoSchema.plugin(mongooseAggregatePaginate);
 //add index for text search
 videoSchema.index({ title: "text", description: "text", tags: "text" });
