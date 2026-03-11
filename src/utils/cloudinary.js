@@ -1,16 +1,16 @@
 const cloudinary = require("cloudinary").v2;
 const config = require("../config/config");
-
 //cloudinary configuration
 cloudinary.config({
   cloud_name: config.cloudinary.cloudName,
-  api_key: config.cloudinary.api_key,
-  api_secret: config.cloudinary.api_secret,
+  api_key: config.cloudinary.cloudApiKey,
+  api_secret: config.cloudinary.cloudApiSecret,
 });
 
 //Function to media to cloudinary
 const uploadToCloudinary = async (filePath, folder) => {
   try {
+    console.log("here", filePath);
     const result = await cloudinary.uploader.upload(filePath, {
       folder,
       resource_type: "auto",

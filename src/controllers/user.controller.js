@@ -1,11 +1,133 @@
-const User = require("../routes/user.route");
+const User = require("../models/user.model");
 const asyncHandler = require("../utils/asyncHandler");
+const ApiError = require("../utils/ApiError");
+const { uploadToCloudinary } = require("../utils/cloudinary");
+const ApiResponse = require("../utils/ApiResponse");
+const {
+  generateAccessToken,
+  generateRefreshToken,
+} = require("../utils/generateToken");
+const config = require("../config/config");
 
+//AccessToken and refresh token generation
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = generateAccessToken(
+      user._id,
+      user.email,
+      user.username,
+    );
+    const refreshToken = generateRefreshToken(userId);
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(500, "Error generating tokens");
+  }
+};
 //Register new User
-const registerUser = asyncHandler(async (req, res) => {});
+const registerUser = asyncHandler(async (req, res) => {
+  const { username, email, password, fullName } = req.body;
+  if (!username || !email || !fullName || !password) {
+    throw new ApiError(400, "username,email,fullName and password is required");
+  }
+  //check user exists
+  const existingUser = await User.findOne({ $or: [{ username }, { email }] });
+  if (existingUser) {
+    throw new ApiError(409, "User already exists");
+  }
+
+  let avatarUpload, coverUpload;
+  if (req.files && req.files.avatar && req.files.avatar[0]?.path) {
+    const avatarResult = await uploadToCloudinary(
+      req.files.avatar[0].path,
+      "youtube/avatars",
+    );
+    if (!avatarResult) {
+      throw new ApiError(500, "Error uploading avatar");
+    }
+    avatarUpload = {
+      public_id: avatarResult.public_id,
+      url: avatarResult.secure_url,
+    };
+  }
+  if (req.files && req.files.coverImage && req.files.coverImage[0]?.path) {
+    const coverResult = await uploadToCloudinary(
+      req.files.coverImage[0].path,
+      "youtube/cover-image",
+    );
+    if (!coverResult) {
+      throw new ApiError(500, "Error uploading cover image");
+    }
+    coverUpload = {
+      public_id: coverResult.public_id,
+      url: coverResult.secure_url,
+    };
+  }
+  const user = await User.create({
+    username: username.toLowerCase(),
+    email,
+    fullName,
+    avatar: Object.keys(avatarUpload).length > 0 ? avatarUpload : undefined,
+    coverImage: Object.keys(coverUpload).length > 0 ? coverUpload : undefined,
+    password,
+  });
+  //remove password and refresh token from response
+  const createdUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+  if (!createdUser) {
+    throw new Error("Error registering user");
+  }
+
+  res
+    .status(201)
+    .json(new ApiResponse(201, createdUser, "User Registered successfully"));
+});
 
 //Login user and create token
-const loginUser = asyncHandler(async (req, res) => {});
+const loginUser = asyncHandler(async (req, res) => {
+  const { email, username, password } = req.body;
+  if (!email && !username) {
+    throw new ApiError(400, "email and username required");
+  }
+  if (!password) {
+    throw new ApiError(400, "password is required");
+  }
+  const user = await User.findOne({
+    $or: [{ email }, { username: username }],
+  });
+  if (!user) {
+    throw new ApiError(400, "User not found!");
+  }
+  //check if password is correct
+
+  const isPasswordValid = await user.isPasswordCorrect(password);
+  console.log("isPasswordValid", isPasswordValid, password);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid credential");
+  }
+  //Generate access token and refresh token
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id,
+  );
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  //set cookies
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: "strict", //CSRF protected
+    secure: config.nodeEnv === "production",
+  };
+  res
+    .status(200)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json(new ApiResponse(200, loggedInUser, "User logged in successfully"));
+});
 
 //logout user and clear token
 const logoutUser = asyncHandler(async (req, res) => {});

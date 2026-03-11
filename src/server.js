@@ -6,7 +6,8 @@ const app = express();
 
 //Connect to mongodb
 connectDB();
-
+//Middleware
+app.use(express.json());
 //Routes
 app.use("/api/v1/user", userRouter);
 

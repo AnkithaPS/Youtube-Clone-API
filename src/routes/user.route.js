@@ -26,6 +26,7 @@ userRouter.post(
   ]),
   registerUser,
 );
+
 userRouter.post("/login", loginUser);
 userRouter.post("/refresh-token", refreshAccessToken);
 userRouter.post("/request-password-reset", requestPasswordReset);

@@ -4,10 +4,11 @@ const apiError = require("../utils/ApiError");
 
 //configure storage
 const storage = multer.diskStorage({
-  destination: function (req, res, cb) {
+  destination: function (req, file, cb) {
     cb(null, "./uploads");
   },
-  filename: function (req, res, cb) {
+
+  filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "_" + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     cb(null, file.fieldname + "_" + uniqueSuffix + ext);
