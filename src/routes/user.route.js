@@ -16,7 +16,7 @@ const {
 } = require("../controllers/user.controller");
 const { upload } = require("../middlewares/upload.middleware");
 const userRouter = express.Router();
-
+const verifyToken = require("../middlewares/auth.middleware");
 //public route
 userRouter.post(
   "/register",
@@ -32,6 +32,7 @@ userRouter.post("/refresh-token", refreshAccessToken);
 userRouter.post("/request-password-reset", requestPasswordReset);
 userRouter.post("/reset-password", resetPassword);
 //Private routes
+userRouter.use(verifyToken);
 userRouter.post("/logout", logoutUser);
 userRouter.get("/profile", getUserProfile);
 userRouter.patch("/change-password", changePassword);

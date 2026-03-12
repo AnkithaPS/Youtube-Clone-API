@@ -10,7 +10,6 @@ cloudinary.config({
 //Function to media to cloudinary
 const uploadToCloudinary = async (filePath, folder) => {
   try {
-    console.log("here", filePath);
     const result = await cloudinary.uploader.upload(filePath, {
       folder,
       resource_type: "auto",
