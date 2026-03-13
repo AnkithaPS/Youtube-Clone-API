@@ -72,6 +72,10 @@ const userSchema = new mongoose.Schema(
         type: Boolean,
         default: true,
       },
+      commentActivity: {
+        type: Boolean,
+        default: true,
+      },
     },
     //password reset setting
     refreshPasswordToken: {

@@ -1,19 +1,17 @@
 const User = require("../models/user.model");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
 const jwt = require("jsonwebtoken");
 const {
   uploadToCloudinary,
   deleteFromCloudinary,
 } = require("../utils/cloudinary");
-const ApiResponse = require("../utils/ApiResponse");
 const {
   generateAccessToken,
   generateRefreshToken,
 } = require("../utils/generateToken");
 const config = require("../config/config");
-const { decode } = require("punycode");
-const { read } = require("fs");
 
 //AccessToken and refresh token generation
 const generateAccessAndRefreshToken = async (userId) => {
