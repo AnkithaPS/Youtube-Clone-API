@@ -9,6 +9,7 @@ const {
   deleteFromCloudinary,
 } = require("../utils/cloudinary");
 const mongoose = require("mongoose");
+const { isParameter } = require("typescript");
 const ObjectId = mongoose.Types.ObjectId;
 
 //Fetch all video details
@@ -92,7 +93,31 @@ const getAllVideos = asyncHandler(async (req, res) => {
 });
 
 //Get video by ID
-const getVideoById = asyncHandler(async (req, res) => {});
+const getVideoById = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId) {
+    throw new ApiError(400, "Video Id is required");
+  }
+  const video = await Video.findByIdAndUpdate(
+    videoId,
+    { $inc: { views: 1 } },
+    { new: true },
+  ).populate("owner", "username fullName avatar");
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+  //add to user's watch history
+  if (req.user) {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { watchHistory: videoId } },
+      { new: true },
+    );
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video fetched successfully!"));
+});
 
 //Publish a video
 const publishVideos = asyncHandler(async (req, res) => {
@@ -146,10 +171,88 @@ const publishVideos = asyncHandler(async (req, res) => {
 });
 
 //Update video by ID
-const updateVideo = asyncHandler(async (req, res) => {});
+const updateVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const { title, description, tags, category, isPublished } = req.body;
+  if (!videoId) {
+    throw new ApiError(400, "Video Id is required");
+  }
+  const video = await Video.findOne({
+    _id: new ObjectId(videoId),
+    owner: req.user._id,
+  });
+  if (!video) {
+    throw new ApiError(400, "Video not found or you don't have permission ");
+  }
+  let thumbnailUpdate = {};
+  if (req.file) {
+    const videoLocalPath = req?.file?.path;
+    if (videoLocalPath) {
+      //delete old video
+      if (video?.thumbnail?.public_id) {
+        await deleteFromCloudinary(video?.thumbnail?.public_id);
+      }
+      //upload new thumbnail
+      const thumbnailUpload = await uploadToCloudinary(
+        videoLocalPath,
+        "youtube/thumbnails",
+      );
+      if (!thumbnailUpload) {
+        throw new ApiError(400, "Error uploading thumbnail");
+      }
+      thumbnailUpdate = {
+        public_id: thumbnailUpload.public_id,
+        url: thumbnailUpload.secure_url,
+      };
+    }
+  }
+  const updateThumbnail = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        title: title || video.title,
+        description: description || video.description,
+        tags: tags ? JSON.parse(tags) : video.tags,
+        category: category || video.category,
+        isPublished:
+          isPublished !== undefined ? isPublished : video.isPublished,
+        thumbnail: thumbnailUpdate,
+      },
+    },
+    { new: true },
+  ).populate("owner", "username fullName avatar");
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updateThumbnail, "Thumbnail updated successfully"),
+    );
+});
 
 //Delete video by ID
-const deleteVideo = asyncHandler(async (req, res) => {});
+const deleteVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId) {
+    throw new ApiError(400, "Video Id is required");
+  }
+  const video = await Video.findOne({
+    _id: new ObjectId(videoId),
+    owner: req.user._id,
+  });
+  if (!video) {
+    throw new ApiError(400, "Video not found or you don't have permission ");
+  }
+  //delete video from cloudinary
+  if (video?.videoFile?.public_id) {
+    await deleteFromCloudinary(video?.videoFile?.public_id, "video");
+  }
+
+  //delete thumbnail from cloudinary
+  if (video?.thumbnail?.public_id) {
+    await deleteFromCloudinary(video?.thumbnail?.public_id, "video");
+  }
+  await Video.findByIdAndDelete(videoId);
+  res.status(200).json(new ApiResponse(200, "Video deleted successfully"));
+});
 
 //Toggle published video status
 const togglePublishStatus = asyncHandler(async (req, res) => {});
