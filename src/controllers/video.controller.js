@@ -9,7 +9,6 @@ const {
   deleteFromCloudinary,
 } = require("../utils/cloudinary");
 const mongoose = require("mongoose");
-const { isParameter } = require("typescript");
 const ObjectId = mongoose.Types.ObjectId;
 
 //Fetch all video details
@@ -255,10 +254,107 @@ const deleteVideo = asyncHandler(async (req, res) => {
 });
 
 //Toggle published video status
-const togglePublishStatus = asyncHandler(async (req, res) => {});
+const togglePublishStatus = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId) {
+    throw new ApiError(400, "Video Id is required");
+  }
+  const video = await Video.findOne({
+    _id: new ObjectId(videoId),
+    owner: req.user._id,
+  });
+  if (!video) {
+    throw new ApiError(400, "Video not found or you don't have permission ");
+  }
+  //toggle publish status
+  const updateVideo = await Video.findByIdAndUpdate(
+    videoId,
+    { $set: { isPublished: !video.isPublished } },
+    { new: true },
+  ).populate("owner", "username fullName avatar");
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updateVideo,
+        `Video ${updateVideo.isPublished ? "published" : "unpublished"} successfully`,
+      ),
+    );
+});
 
 //Generate share link for video
-const shareVideo = asyncHandler(async (req, res) => {});
+const shareVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const { platform = "general" } = req.query;
+  if (!videoId) {
+    throw new ApiError(400, "Video Id is required");
+  }
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found or you don't have permission ");
+  }
+  //generate share link
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const videoUrl = `${baseUrl}/api/v1/video/${videoId}`;
+
+  //generate platform specific share link
+  let shareLinks = {
+    direct: videoUrl,
+    Clipboard: videoUrl,
+  };
+  console.log(platform);
+  switch (platform.toLowerCase()) {
+    case "facebook":
+      shareLinks.facebook = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(videoUrl)}`;
+      break;
+
+    case "twitter":
+      shareLinks.twitter = `https://www.twitter.com/intent/tweet?url=${encodeURIComponent(videoUrl)}&text=${encodeURIComponent(video.title)}`;
+      break;
+
+    case "whatsapp":
+      shareLinks.whatsapp = `https://api.whatsapp.com/send?text=${encodeURIComponent(video.title + " " + videoUrl)}&text=${encodeURIComponent(video.title)}`;
+      break;
+
+    case "linkedin":
+      shareLinks.linkedin = `https://www.linkedin.com/sharing/share-offsite?url=${encodeURIComponent(videoUrl)}`;
+      break;
+
+    case "telegram":
+      shareLinks.telegram = `https://t.me/share/url?url=${encodeURIComponent(videoUrl)}&text=${encodeURIComponent(video.title)}`;
+      break;
+
+    case "reddit":
+      shareLinks.reddit = `https://reddit.com/submit?url=${encodeURIComponent(videoUrl)}&title=${encodeURIComponent(video.title)}`;
+      break;
+
+    default:
+      //for general
+      shareLinks = {
+        ...shareLinks,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(videoUrl)}`,
+        twitter: `https://www.twitter.com/intent/tweet?url=${encodeURIComponent(videoUrl)}&text=${encodeURIComponent(video.title)}`,
+        whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(video.title + " " + videoUrl)}&text=${encodeURIComponent(video.title)}`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite?url=${encodeURIComponent(videoUrl)}`,
+        telegram: `https://t.me/share/url?url=${encodeURIComponent(videoUrl)}&text=${encodeURIComponent(video.title)}`,
+        reddit: `https://reddit.com/submit?url=${encodeURIComponent(videoUrl)}&title=${encodeURIComponent(video.title)}`,
+      };
+  }
+  await Video.findByIdAndUpdate(videoId, { $inc: { shares: 1 } });
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        videoId,
+        videoTitle: video.title,
+        thumbnail: video.thumbnail,
+        shareLinks,
+      },
+      "Video link shared successfully!",
+    ),
+  );
+});
 
 module.exports = {
   getAllVideos,

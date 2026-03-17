@@ -14,7 +14,7 @@ const videoRouter = express.Router();
 
 //public route
 videoRouter.get("/", getAllVideos);
-videoRouter.get("/:videoId/share", shareVideo);
+videoRouter.get("/share/:videoId", shareVideo);
 
 //private route
 videoRouter.use(verifyToken);
@@ -29,6 +29,6 @@ videoRouter.post(
 videoRouter.get("/:videoId", getVideoById);
 videoRouter.patch("/:videoId", upload.single("thumbnail"), updateVideo);
 videoRouter.delete("/:videoId", deleteVideo);
-videoRouter.patch("/:toggle-publish/:videoId", togglePublishStatus);
+videoRouter.patch("/toggle-publish/:videoId", togglePublishStatus);
 
 module.exports = videoRouter;

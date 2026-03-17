@@ -3,6 +3,8 @@ const config = require("./config/config");
 const userRouter = require("./routes/user.route");
 const channelRouter = require("./routes/channel.route");
 const videoRouter = require("./routes/video.route");
+const playlistRouter = require("./routes/playlist.route");
+const notificationRouter = require("./routes/notification.route");
 const connectDB = require("./config/connectDB");
 const cookieParser = require("cookie-parser");
 const { errorHandler, notFound } = require("./middlewares/error.middleware");
@@ -18,7 +20,8 @@ app.use(express.json());
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/channel", channelRouter);
 app.use("/api/v1/video", videoRouter);
-
+app.use("/api/v1/notification", notificationRouter);
+app.use("/api/v1/playlist", playlistRouter);
 //Error handler
 app.use(notFound);
 app.use(errorHandler);
