@@ -5,6 +5,8 @@ const channelRouter = require("./routes/channel.route");
 const videoRouter = require("./routes/video.route");
 const playlistRouter = require("./routes/playlist.route");
 const notificationRouter = require("./routes/notification.route");
+const likeRouter = require("./routes/like.route");
+const commentRouter = require("./routes/comment.route");
 const connectDB = require("./config/connectDB");
 const cookieParser = require("cookie-parser");
 const { errorHandler, notFound } = require("./middlewares/error.middleware");
@@ -22,6 +24,9 @@ app.use("/api/v1/channel", channelRouter);
 app.use("/api/v1/video", videoRouter);
 app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/playlist", playlistRouter);
+app.use("/api/v1/like", likeRouter);
+app.use("/api/v1/comment", commentRouter);
+
 //Error handler
 app.use(notFound);
 app.use(errorHandler);

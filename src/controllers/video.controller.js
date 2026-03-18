@@ -303,7 +303,6 @@ const shareVideo = asyncHandler(async (req, res) => {
     direct: videoUrl,
     Clipboard: videoUrl,
   };
-  console.log(platform);
   switch (platform.toLowerCase()) {
     case "facebook":
       shareLinks.facebook = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(videoUrl)}`;

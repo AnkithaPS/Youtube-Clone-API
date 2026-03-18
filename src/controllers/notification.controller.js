@@ -120,6 +120,7 @@ const createNotification = async (recipientId, senderId, content, type) => {
   try {
     //check if recipient has enabled notification for this
     const recipient = await User.findById(recipientId);
+
     if (!recipient) {
       return null;
     }

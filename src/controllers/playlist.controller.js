@@ -1,14 +1,9 @@
 const User = require("../models/user.model");
-const Channel = require("../models/channelAnalytics.model");
 const Video = require("../models/video.model");
 const Playlist = require("../models/playlist.mode");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
-const {
-  uploadToCloudinary,
-  deleteFromCloudinary,
-} = require("../utils/cloudinary");
 const mongoose = require("mongoose");
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -40,7 +35,7 @@ const addVideoToPlaylistBy = asyncHandler(async (req, res) => {
     owner: req.user._id,
   });
   if (!playlist) {
-    throw new ApiError(400, "Playlist not found or you don't have permission");
+    throw new ApiError(404, "Playlist not found or you don't have permission");
   }
   //check if playlist has video
   if (playlist?.videos.includes(videoId)) {
@@ -70,8 +65,6 @@ const getPlaylist = asyncHandler(async (req, res) => {
     owner: new ObjectId(user),
     ...(isOwner ? {} : { isPublic: true }),
   };
-  console.log(filter);
-
   const playlist = await Playlist.aggregate([
     { $match: filter },
     {
@@ -173,7 +166,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
   //check if playlist is private and user is not the owner
   if (
     !playlistData.isPublic &&
-    (!req.user || playlistData._id.toString() !== req.user._id.toString())
+    (!req.user || playlistData.owner._id.toString() !== req.user._id.toString())
   ) {
     throw new ApiError(403, "You don't have permission to view this playlist");
   }
@@ -183,13 +176,83 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 });
 
 //remove video from playlist
-const removeVideoFromPlaylist = asyncHandler(async (req, res) => {});
+const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
+  const { playlistId, videoId } = req.params;
+  if (!playlistId || !videoId) {
+    throw new ApiError(400, "Playlist and Video Id is required");
+  }
+  const playlist = await Playlist.findOne({
+    _id: playlistId,
+    owner: req.user._id,
+  });
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found or you don't have permission");
+  }
+  //check if playlist has video
+  if (!playlist?.videos.includes(videoId)) {
+    throw new ApiError(400, "Video not found in playlist");
+  }
+  //add video to playlist
+  playlist.videos = playlist.videos.filter(
+    (video) => video.toString() !== videoId,
+  );
+  await playlist.save();
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        playlist,
+        "Video removed from playlist successfully!",
+      ),
+    );
+});
 
 //update playlist
-const updatePlaylist = asyncHandler(async (req, res) => {});
+const updatePlaylist = asyncHandler(async (req, res) => {
+  const { playlistId } = req.params;
+  const { name, description, isPublic = true } = req.body;
+  if (!playlistId) {
+    throw new ApiError(400, "Playlist ID is required");
+  }
+  if ((!name || name.trim() === "") && !description && isPublic === undefined) {
+    throw new ApiError(400, "Atleast one field is required");
+  }
+  const playlist = await Playlist.findOne({
+    _id: new ObjectId(playlistId),
+    owner: req.user._id,
+  });
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found or you don't have permission!");
+  }
+  if (name) playlist.name = name;
+  if (description !== undefined) playlist.description = description;
+  if (isPublic !== undefined) playlist.isPublic = isPublic;
+
+  await playlist.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(201, playlist, "Playlist updated successfully"));
+});
 
 //delete playlist
-const deletePlaylist = asyncHandler(async (req, res) => {});
+const deletePlaylist = asyncHandler(async (req, res) => {
+  const { playlistId } = req.params;
+  if (!playlistId) {
+    throw new ApiError(400, "Playlist ID is required");
+  }
+  const playlist = await Playlist.findOne({
+    _id: new ObjectId(playlistId),
+    owner: req.user._id,
+  });
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found or you don't have permission!");
+  }
+  await Playlist.findByIdAndDelete(playlistId);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Playlist deleted successfully"));
+});
 
 module.exports = {
   createPlaylist,

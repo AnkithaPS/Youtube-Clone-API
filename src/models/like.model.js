@@ -31,12 +31,26 @@ likeSchema.pre("save", function (next) {
     );
     return next(error);
   }
-  next();
+  return;
 });
 
 //compound index to ensure user can only like video or comment only once
-likeSchema.index({ video: 1, likedBy: 1 }, { unique: true, spares: true }); //spare=>include document only if both field present
-likeSchema.index({ comment: 1, likedBy: 1 }, { unique: true, spares: true }); //spare=>include document only if both field present
+likeSchema.index(
+  { video: 1, likedBy: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { video: { $exists: true, $ne: null } },
+    spare: true,
+  },
+); //spare=>include document only if both field present
+likeSchema.index(
+  { comment: 1, likedBy: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { comment: { $exists: true, $ne: null } },
+    spare: true,
+  },
+); //spare=>include document only if both field present
 
 const Like = mongoose.model("Like", likeSchema);
 module.exports = Like;
