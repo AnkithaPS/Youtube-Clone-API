@@ -5,14 +5,19 @@ const {
   getChannelInfo,
   updateChannelInfo,
   updateNotificationSettings,
-  getChannelVideo,
+  getChannelVideos,
   getChannelShareLink,
 } = require("../controllers/channel.controller");
+const {
+  getChannelAnalyticsOverview,
+  getChannelDetailedAnalytics,
+  updateChannelAnalytics,
+} = require("../controllers/channelAnalytics.controller");
 const channelRouter = express.Router();
 
 //Public route
 channelRouter.get("/:username", getChannelInfo);
-channelRouter.get("/:username/videos", getChannelVideo);
+channelRouter.get("/:username/videos", getChannelVideos);
 channelRouter.get("/:username/share", getChannelShareLink);
 
 //private(protected) route
@@ -24,4 +29,11 @@ channelRouter.patch(
 );
 channelRouter.patch("/notification-settings", updateNotificationSettings);
 //Analytics overview
+channelRouter.get(
+  "/analytics/overview/:channelId",
+  verifyToken,
+  getChannelAnalyticsOverview,
+);
+channelRouter.get("/analytics/detail/:channelId", getChannelDetailedAnalytics);
+channelRouter.patch("/:channelId", updateChannelAnalytics);
 module.exports = channelRouter;

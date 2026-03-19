@@ -12,7 +12,84 @@ const ObjectId = mongoose.Types.ObjectId;
 
 //Fetch all comments on video
 const getVideoComment = asyncHandler(async (req, res) => {
-  return res.status(200).json(new ApiResponse(200, {}, message));
+  const { videoId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  if (!videoId) {
+    throw new ApiError(400, "Video ID is required");
+  }
+  const comment = await Comment.aggregate([
+    {
+      $match: {
+        video: new ObjectId(videoId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "comments",
+        localField: "parentComment",
+        foreignField: "_id",
+        as: "replies",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        owner: { $first: "$owner" },
+        repliesCount: { $size: "$replies" },
+      },
+    },
+    {
+      $sort: { createdAt: 1 },
+    },
+    {
+      $skip: parseInt(page - 1) * parseInt(limit),
+    },
+    {
+      $limit: parseInt(limit),
+    },
+  ]);
+  const totalComment = await Comment.countDocuments({
+    video: new ObjectId(videoId),
+    parentComment: null,
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        comment,
+        totalComment,
+        currentPage: page,
+        totalPage: Math.ceil(totalComment / parseInt(limit)),
+      },
+      "Comments fetched successfully",
+    ),
+  );
 });
 
 //Add new comment to video
@@ -79,46 +156,117 @@ const addComment = asyncHandler(async (req, res) => {
 
 //Update an existing comment
 const updateComment = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+  const { content } = req.body;
+  if (!commentId) {
+    throw new ApiError(400, "Comment ID is required");
+  }
+  if (!content || content.trim() === "") {
+    throw new ApiError(400, "Comment content is required");
+  }
+
+  const comment = await Comment.findOne({
+    _id: commentId,
+    owner: req.user._id,
+  });
+  if (!comment) {
+    throw new ApiError(
+      404,
+      "Comment not found or you don't have permission to update comment",
+    );
+  }
+  comment.content = content;
+  await comment.save();
+
   return res
     .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { likedVideo, totalLikedVideo: likedVideo.length },
-        "Liked video fetched successfully",
-      ),
-    );
+    .json(new ApiResponse(200, comment, "Comment updated successfully"));
 });
 
 //Delete comment
 const deleteComment = asyncHandler(async (req, res) => {
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { likedUsers, totalLikedUsers: likedUsers.length },
-        "Liked users fetched successfully",
-      ),
-    );
-});
-
-//Fetch all reply on comment
-const getAllReply = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
   if (!commentId) {
     throw new ApiError(400, "Comment ID is required");
   }
 
+  const comment = await Comment.findOne({
+    _id: commentId,
+    owner: req.user._id,
+  });
+  if (!comment) {
+    throw new ApiError(
+      404,
+      "Comment not found or you don't have permission to delete comment",
+    );
+  }
+  await Comment.deleteMany({
+    $or: [{ _id: new ObjectId(commentId) }, { parentComment: commentId }],
+  });
+
   return res
     .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { likedUsers, totalLikedUsers: likedUsers.length },
-        "Liked users fetched successfully",
-      ),
-    );
+    .json(new ApiResponse(200, {}, " comment deleted successfully"));
+});
+
+//Fetch all reply on comment
+const getAllReply = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  if (!commentId) {
+    throw new ApiError(400, "Comment ID is required");
+  }
+
+  const replies = await Comment.aggregate([
+    {
+      $match: {
+        parentComment: new ObjectId(commentId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: { owner: { $first: "$owner" } },
+    },
+    { $sort: { createdAt: -1 } },
+    {
+      $skip: parseInt(page - 1) * parseInt(limit),
+    },
+    {
+      $limit: parseInt(limit),
+    },
+  ]);
+  const totalReplies = await Comment.countDocuments({
+    parentComment: new ObjectId(commentId),
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        replies,
+        totalReplies,
+        currentPage: page,
+        totalPage: Math.ceil(totalReplies) / parseInt(limit),
+      },
+      "All replies fetched successfully",
+    ),
+  );
 });
 
 module.exports = {
